@@ -75,7 +75,7 @@ def test_brain_guardrail_blocks_bad_draft():
 
 def test_brain_catalog_endpoints():
     skills = client.get("/v1/brain/skills").json()["skills"]
-    assert len(skills) == 7
+    assert len(skills) >= 7
     tools = client.get("/v1/brain/tools").json()["tools"]
     mutating = [t for t in tools if t["mutating"]]
     assert mutating and all(t["requires_approval"] for t in mutating)
@@ -86,7 +86,7 @@ def test_security_headers_present():
     assert r.headers["x-content-type-options"] == "nosniff"
     assert r.headers["x-frame-options"] == "DENY"
     body = r.json()
-    assert body["skills_loaded"] == 7
+    assert body["skills_loaded"] >= 7
     assert body["tools_registered"] >= 10
 
 

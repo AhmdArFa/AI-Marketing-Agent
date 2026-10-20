@@ -3,9 +3,11 @@
 import { useState } from "react";
 import ArchitectureExplorer from "../components/ArchitectureExplorer";
 import BrainConsole from "../components/BrainConsole";
+import CampaignStudio from "../components/CampaignStudio";
 import DomainExplorer from "../components/DomainExplorer";
 
 const TABS = [
+  { id: "studio", label: "Campaign Studio" },
   { id: "console", label: "Brain Console" },
   { id: "architecture", label: "Architecture and Patterns" },
   { id: "domain", label: "Domain: 4S PLUS" },
@@ -14,7 +16,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default function Home() {
-  const [tab, setTab] = useState<TabId>("console");
+  const [tab, setTab] = useState<TabId>("studio");
   return (
     <main>
       <header>
@@ -38,6 +40,7 @@ export default function Home() {
         ))}
       </nav>
 
+      {tab === "studio" && <CampaignStudio />}
       {tab === "console" && <BrainConsole />}
       {tab === "architecture" && <ArchitectureExplorer />}
       {tab === "domain" && <DomainExplorer />}

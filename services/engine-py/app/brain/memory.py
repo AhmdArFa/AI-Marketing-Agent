@@ -55,6 +55,16 @@ class AgentMemory:
     def fact(self, key: str) -> str | None:
         return self._facts.get(key)
 
+    def session_summary(self, session_id: str) -> str:
+        turns = list(self._turns.get(session_id, []))
+        if not turns:
+            return "No turns recorded for this session yet."
+        skills = sorted({t.get("skill") or "unmatched" for t in turns})
+        return (
+            f"{len(turns)} turn(s) this session. Skills used: {', '.join(skills)}. "
+            f"Latest: {turns[-1].get('summary', '')}"
+        )
+
     def learn(self, skill_id: str, approvals_queued: int, guardrail_blocks: int) -> None:
         stats = self._outcomes[skill_id]
         stats["runs"] += 1

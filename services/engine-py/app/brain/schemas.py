@@ -32,4 +32,7 @@ class BrainRunResponse(BaseModel):
     grounding: List[Dict[str, Any]]
     guardrail: Optional[Dict[str, Any]] = None
     summary: str
+    session_summary: Optional[str] = None
+    context_report: Optional[Dict[str, Any]] = None
+    trace: Optional[Dict[str, Any]] = None
     memory_insights: Dict[str, Any]

@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from .brain import Brain
 from .brain.schemas import BrainRunRequest, BrainRunResponse
 from .domain4s.campaign_brief import build_campaign_brief
+from .generation.copywriter import generate_campaign
+from .generation.creative import render_image
+from .publishing.publisher import publish_package
 from .domain4s.content_calendar import build_calendar
 from .domain4s.guardrails import check_draft
 from .domain4s.lead_scoring import score_leads
@@ -93,6 +96,13 @@ def brain_tools(format: str = "native") -> dict:
     return {"tools": brain.registry.list()}
 
 
+@app.get("/v1/brain/traces")
+def brain_traces(limit: int = 10) -> dict:
+    from .brain.harness import recent_traces
+
+    return {"traces": recent_traces(limit)}
+
+
 @app.get("/metrics")
 def metrics() -> dict:
     from .security import metrics_snapshot
@@ -137,6 +147,73 @@ def domain_retention(req: RetentionRequest) -> RetentionResponse:
 def domain_calendar(req: ContentCalendarRequest) -> ContentCalendarResponse:
     slots = build_calendar(req.weeks, req.posts_per_week, req.audience)
     return ContentCalendarResponse(audience=req.audience, slots=slots)
+
+
+@app.post("/v1/generate/campaign")
+def generate_campaign_endpoint(payload: dict) -> dict:
+    result = generate_campaign(
+        company_name=payload.get("company_name", "Vo Technology"),
+        product_name=payload.get("product_name", "4S PLUS"),
+        domain=payload.get("domain", "automotive_erp"),
+        audience=payload.get("audience", "prospecting"),
+        language=payload.get("language", "en"),
+        count=int(payload.get("count", 3)),
+    )
+    for post in result["posts"]:
+        img = post["image"]
+        from urllib.parse import urlencode
+
+        post["image_url"] = "/v1/generate/image?" + urlencode(
+            {
+                "company": result["company"],
+                "product": result["product"],
+                "headline": img["headline"],
+                "subline": img["subline"],
+                "theme": img["theme"],
+            }
+        )
+    return result
+
+
+@app.get("/v1/generate/image")
+def generate_image_endpoint(
+    company: str = "Vo Technology",
+    product: str = "4S PLUS",
+    headline: str = "One Car. One Journey.",
+    subline: str = "",
+    theme: str = "automotive",
+):
+    from fastapi.responses import Response
+
+    png = render_image(company, product, headline, subline, theme)
+    return Response(content=png, media_type="image/png")
+
+
+@app.post("/v1/publish")
+def publish_endpoint(payload: dict) -> dict:
+    if not payload.get("approved"):
+        raise HTTPException(
+            status_code=403,
+            detail="Publishing requires a human approval decision first (approved=true from the orchestrator gate)",
+        )
+    post = payload.get("post", {})
+    img = post.get("image", {})
+    png = None
+    if img:
+        png = render_image(
+            payload.get("company_name", "Vo Technology"),
+            payload.get("product_name", "4S PLUS"),
+            img.get("headline", ""),
+            img.get("subline", ""),
+            img.get("theme", "automotive"),
+        )
+    return publish_package(
+        company=payload.get("company_name", "Vo Technology"),
+        post=post,
+        image_png=png,
+        channel=payload.get("channel", "file_export"),
+        approved=True,
+    )
 
 
 @app.post("/v1/domain4s/campaign-brief")

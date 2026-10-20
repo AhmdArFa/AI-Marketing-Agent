@@ -63,6 +63,16 @@ TypeScript orchestrator (`apps/orchestrator-ts`):
   config validated at startup, hardened engine client (timeout, one retry,
   API key header), approval gate state machine, and 4S PLUS workflows.
 
+## Agent engineering
+
+The ten agent engineering disciplines, the approach chosen for each one in
+this product, and what was rejected and why: 
+[docs/AGENT_ENGINEERING.md](docs/AGENT_ENGINEERING.md). Highlights: a run
+harness with span traces (`GET /v1/brain/traces`), a bounded loop with one
+replan and one retry per tool, deliberate context packs with budgets and a
+drop report, tool permission scopes with a safe execution contract, and
+approval proposals enriched with risk, scope, preview, and expiry.
+
 ## Web UI
 
 A Next.js interface lives in `apps/web`:

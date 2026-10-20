@@ -40,6 +40,23 @@ def _run_case(case: Dict[str, Any]) -> bool:
         )
     if kind == "guardrail":
         return check_draft(case["text"])["ok"] == case["expect_ok"]
+    if kind == "brain_shield":
+        from app.brain import Brain
+
+        out = Brain().run("eval-shield", case["goal"], case.get("context", {}))
+        return (
+            len(out["blocked_approvals"]) >= case["expect_blocked_min"]
+            and out["executed_mutations"] == []
+            and out["trace"]["status"] in ("ok", "degraded")
+        )
+    if kind == "brain_budget":
+        from app.brain import Brain
+
+        try:
+            Brain().run("eval-budget", "Score my leads", {"blob": "x" * 60000})
+            return False
+        except ValueError:
+            return True
     if kind == "campaign_brief":
         brief = build_campaign_brief(case["answers"])
         if brief["complete"] != case["expect_complete"]:

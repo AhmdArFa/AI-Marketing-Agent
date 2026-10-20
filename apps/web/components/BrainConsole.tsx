@@ -202,6 +202,26 @@ export default function BrainConsole() {
             </>
           )}
 
+          {result.trace && (
+            <>
+              <h3>Run trace (harness)</h3>
+              <p className="summary">
+                Run {result.trace.run_id}: {result.trace.status}, {result.trace.iterations} iteration(s),{" "}
+                {result.trace.total_duration_ms} ms total
+              </p>
+              <ol className="steps">
+                {result.trace.spans.map((s: any, i: number) => (
+                  <li key={i}>
+                    <code>{s.name}</code> <span className="kind">{s.kind}</span>
+                    <span className="note">
+                      {s.status}, {s.duration_ms} ms {s.detail}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+
           <h3>Tool results</h3>
           <pre className="json">{JSON.stringify(result.results, null, 2)}</pre>
         </div>

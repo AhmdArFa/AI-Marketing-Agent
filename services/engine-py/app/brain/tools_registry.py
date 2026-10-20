@@ -6,10 +6,14 @@ approve it first. Mutating tools are never executed by the brain. They are
 returned as pending approvals for the TypeScript layer to gate.
 """
 
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List
 
+MAX_RESULT_CHARS = 20_000
+
 from ..domain4s.campaign_brief import build_campaign_brief
+from ..generation.copywriter import generate_campaign
 from ..domain4s.content_calendar import build_calendar
 from ..domain4s.guardrails import check_draft
 from ..domain4s.lead_scoring import score_leads
@@ -35,6 +39,9 @@ class Tool:
     requires_approval: bool = False
     tags: List[str] = field(default_factory=list)
     input_schema: Dict[str, Any] = field(default_factory=lambda: dict(GENERIC_INPUT_SCHEMA))
+    # Permission scope, least privilege by construction: read and compute run
+    # freely inside the brain; write and external can only ever be proposals.
+    scope: str = "compute"
 
     def mcp_descriptor(self) -> Dict[str, Any]:
         """MCP tools/list shape: name, description, inputSchema."""
@@ -55,6 +62,32 @@ class ToolRegistry:
             raise KeyError(f"Unknown tool: {name}")
         return self._tools[name]
 
+    def execute(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Safe execution contract (Tool Design): never raises into the loop.
+
+        Returns {ok, data|error, duration_ms, truncated}. Oversized results
+        are summarized, tool exceptions become structured errors the harness
+        can retry or degrade on.
+        """
+        tool = self.get(name)
+        started = time.perf_counter()
+        try:
+            data = tool.handler(args)
+            duration = round((time.perf_counter() - started) * 1000, 2)
+            truncated = False
+            if len(repr(data)) > MAX_RESULT_CHARS:
+                truncated = True
+                if isinstance(data, list):
+                    data = {"truncated_list": True, "count": len(data), "sample": data[:3]}
+                elif isinstance(data, dict):
+                    data = {"truncated_dict": True, "keys": list(data)[:20]}
+                else:
+                    data = {"truncated_value": True, "preview": repr(data)[:500]}
+            return {"ok": True, "data": data, "duration_ms": duration, "truncated": truncated}
+        except Exception as exc:
+            duration = round((time.perf_counter() - started) * 1000, 2)
+            return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "duration_ms": duration}
+
     def mcp_list(self) -> List[Dict[str, Any]]:
         return [t.mcp_descriptor() for t in self._tools.values()]
 
@@ -65,6 +98,7 @@ class ToolRegistry:
                 "description": t.description,
                 "mutating": t.mutating,
                 "requires_approval": t.requires_approval,
+                "scope": t.scope,
                 "tags": t.tags,
             }
             for t in self._tools.values()
@@ -102,6 +136,41 @@ def build_default_registry() -> ToolRegistry:
         description="Monthly content calendar from the 4S PLUS content pillars",
         handler=lambda a: {"slots": build_calendar(int(a.get("weeks", 4)), int(a.get("posts_per_week", 3)), a.get("audience", "prospecting"))},
         tags=["marketing", "domain4s", "content"],
+    ))
+    reg.register(Tool(
+        name="generation.campaign_package",
+        description="Generate real marketing posts (text, channel variants, image brief) for a named company and domain",
+        handler=lambda a: generate_campaign(
+            company_name=a.get("company_name", "Vo Technology"),
+            product_name=a.get("product_name", "4S PLUS"),
+            domain=a.get("domain", "automotive_erp"),
+            audience=a.get("audience", "prospecting"),
+            language=a.get("language", "en"),
+            count=int(a.get("count", 3)),
+        ),
+        tags=["marketing", "generation"],
+        input_schema={
+            "type": "object",
+            "properties": {
+                "company_name": {"type": "string"},
+                "product_name": {"type": "string"},
+                "domain": {"type": "string"},
+                "audience": {"type": "string", "enum": ["prospecting", "dealer_marketing"]},
+                "language": {"type": "string", "enum": ["en", "ar"]},
+                "count": {"type": "integer"},
+            },
+            "required": ["company_name"],
+        },
+    ))
+    reg.register(Tool(
+        name="publishing.publish",
+        description="Push an approved post package to a channel (file export, webhook, Meta). Executed only by the orchestrator after a human approval, through POST /v1/publish; the brain can only propose it",
+        handler=lambda a: {"status": "requires_orchestrator_execution",
+                           "detail": "Mutations execute only via /v1/publish after human approval"},
+        mutating=True,
+        requires_approval=True,
+        tags=["publishing", "external"],
+        scope="external",
     ))
     reg.register(Tool(
         name="domain4s.campaign_brief",
