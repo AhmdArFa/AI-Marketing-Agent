@@ -63,7 +63,10 @@ def _shape(text: str) -> str:
 
 def _measure(draw: ImageDraw.ImageDraw, text: str, font) -> float:
     if HAS_RAQM and _ARABIC.search(text or ""):
-        return draw.textlength(text, font=font, direction="rtl", language="ar")
+        try:
+            return draw.textlength(text, font=font, direction="rtl", language="ar")
+        except Exception:
+            pass  # fallback fonts without a raqm layout engine land here
     return draw.textlength(_shape(text), font=font)
 
 
@@ -85,9 +88,12 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, font, max_width: int) -> list:
 def _draw_line(draw: ImageDraw.ImageDraw, x_left: int, x_right: int, y: int, text: str, font, fill) -> None:
     if _ARABIC.search(text or ""):
         if HAS_RAQM:
-            draw.text((x_right, y), text, font=font, fill=fill, direction="rtl", language="ar", anchor="ra")
-        else:
-            draw.text((x_left, y), _shape(text), font=font, fill=fill)
+            try:
+                draw.text((x_right, y), text, font=font, fill=fill, direction="rtl", language="ar", anchor="ra")
+                return
+            except Exception:
+                pass  # fallback font without raqm layout: draw shaped text plainly
+        draw.text((x_left, y), _shape(text), font=font, fill=fill)
     else:
         draw.text((x_left, y), text, font=font, fill=fill)
 
