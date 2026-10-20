@@ -96,6 +96,13 @@ def test_semantic_fact_memory():
     assert hits and hits[0]["doc_id"] == "fact:preferred_channel"
 
 
+def test_cors_allowlist_for_web_ui():
+    r = client.get("/health", headers={"Origin": "http://localhost:3000"})
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    evil = client.get("/health", headers={"Origin": "https://evil.example.com"})
+    assert evil.headers.get("access-control-allow-origin") != "https://evil.example.com"
+
+
 def test_skills_catalog_now_seven():
     skills = client.get("/v1/brain/skills").json()["skills"]
     assert len(skills) == 7

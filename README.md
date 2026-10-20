@@ -63,6 +63,23 @@ TypeScript orchestrator (`apps/orchestrator-ts`):
   config validated at startup, hardened engine client (timeout, one retry,
   API key header), approval gate state machine, and 4S PLUS workflows.
 
+## Web UI
+
+A Next.js interface lives in `apps/web`:
+
+- **Brain Console:** pick a preset mission (lead scoring, retention,
+  campaign and draft check, campaign brief, even a prompt injection attempt),
+  run the real brain against the Python engine, and watch the plan, shield
+  verdict, pending or blocked approvals, and draft evaluation scores.
+- **Architecture and Patterns:** the brain loop, clickable layer explorer,
+  the design, architecture, and agent patterns in use with the file that
+  implements each, and the principles the build follows.
+- **Domain 4S PLUS:** the One Car Journey, modules, personas, and playbooks.
+
+The engine allows the UI origin through a CORS allowlist
+(`ENGINE_CORS_ORIGINS`, development default covers localhost ports 3000 and
+3001). Set `NEXT_PUBLIC_ENGINE_URL` when the engine lives elsewhere.
+
 ## Run it
 
 ```bash
@@ -77,6 +94,11 @@ pytest -q
 cd apps/orchestrator-ts
 npm install
 npm run demo
+
+# Web UI (new terminal, then open http://localhost:3000)
+cd apps/web
+npm install
+npm run dev
 ```
 
 Or with Docker: copy `.env.example` to `.env`, then `docker compose up --build`.

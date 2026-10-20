@@ -1,4 +1,7 @@
+import os
+
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from .brain import Brain
 from .brain.schemas import BrainRunRequest, BrainRunResponse
@@ -35,8 +38,19 @@ from .schemas import (
     RagRetrieveResponse,
 )
 
-app = FastAPI(title="AI Marketing Agent: Data, Model and Brain Layer", version="0.2.0")
+app = FastAPI(title="AI Marketing Agent: Data, Model and Brain Layer", version="0.4.0")
 app.add_middleware(SecurityMiddleware)
+# The web UI is a separate origin. Allowlist only, never a wildcard in
+# production: set ENGINE_CORS_ORIGINS to the real UI origin(s).
+_cors_origins = os.getenv(
+    "ENGINE_CORS_ORIGINS", "http://localhost:3000,http://localhost:3001"
+).split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Role", "X-Request-Id"],
+)
 llm = LLMClient()
 brain = Brain()
 

@@ -8,8 +8,16 @@ services:
   orchestrator-ts:
     build: ./apps/orchestrator-ts
     ports:
-      - "3000:3000"
+      - "3100:3000"
     environment:
       - PYTHON_ENGINE_URL=http://engine-py:8000
+    depends_on:
+      - engine-py
+  web:
+    build: ./apps/web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_ENGINE_URL=http://localhost:8000
     depends_on:
       - engine-py

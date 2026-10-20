@@ -19,6 +19,19 @@ jobs:
           pip install -r requirements.txt
           pytest -q
 
+  web-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install and build
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+
   typescript-orchestrator:
     runs-on: ubuntu-latest
     steps:
