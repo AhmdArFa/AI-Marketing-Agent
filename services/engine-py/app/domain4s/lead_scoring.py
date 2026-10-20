@@ -10,10 +10,12 @@ from typing import Any, Dict, List
 BUSINESS_FIT = {"dealer": 25, "workshop": 25, "parts_trader": 18, "fleet": 15, "other": 5}
 SIGNAL_POINTS = {
     "demo_requested": 25,
+    "demo_attended": 20,
     "pricing_page": 15,
     "replied": 12,
     "referral": 12,
     "event_meeting": 10,
+    "case_study_download": 8,
     "website_visit": 4,
 }
 PAIN_POINTS = {"paper": 12, "excel": 10, "none": 6, "other_erp": 3}

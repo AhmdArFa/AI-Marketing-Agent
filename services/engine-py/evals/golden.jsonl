@@ -1,0 +1,11 @@
+{"id": "ret-brand-voice", "kind": "retrieval", "collection": "brand", "query": "brand voice simple Arabic no hype", "expect_top": "brand/voice-v1"}
+{"id": "ret-domain-jobcard", "kind": "retrieval", "collection": "domain4s", "query": "JobCard lifecycle W.I.P Ready for invoicing", "expect_top": "domain4s/service-jobcard"}
+{"id": "ret-domain-journey", "kind": "retrieval", "collection": "domain4s", "query": "one car journey chassis sales service survey", "expect_top": "domain4s/one-car-journey"}
+{"id": "lead-hot-dealer", "kind": "lead_score", "lead": {"company": "Delta Motors", "business_type": "dealer", "branches": 3, "monthly_jobs_or_sales": 240, "current_system": "excel", "signals": ["demo_requested", "demo_attended"], "days_since_last_touch": 2}, "expect_tier": "hot"}
+{"id": "lead-cold-small", "kind": "lead_score", "lead": {"company": "Tiny Shop", "business_type": "other", "monthly_jobs_or_sales": 3, "current_system": "other_erp", "signals": [], "days_since_last_touch": 300}, "expect_tier": "cold"}
+{"id": "retention-due", "kind": "retention", "record": {"customer": "Omar", "chassis": "CH1", "months_since_last_service": 7, "km_since_last_service": 4000}, "expect_segment": "maintenance_due"}
+{"id": "retention-detractor-first", "kind": "retention", "record": {"customer": "Karim", "chassis": "CH3", "months_since_last_service": 9, "last_survey_score": 3}, "expect_segment": "survey_detractors"}
+{"id": "guardrail-flags-guarantee", "kind": "guardrail", "text": "4S PLUS gives guaranteed results for every workshop.", "expect_ok": false}
+{"id": "guardrail-passes-clean", "kind": "guardrail", "text": "Follow one car from sale to survey in 4S PLUS. Book a live demo on your own data.", "expect_ok": true}
+{"id": "brief-missing-fields", "kind": "campaign_brief", "answers": {"product_focus": "service"}, "expect_complete": false, "expect_missing_contains": "monthly_goal"}
+{"id": "brief-complete", "kind": "campaign_brief", "answers": {"product_focus": "service", "audience_type": "prospecting", "monthly_goal": "demos"}, "expect_complete": true}

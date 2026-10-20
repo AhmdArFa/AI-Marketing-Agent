@@ -15,6 +15,11 @@ from ..pipelines.rag import KB
 
 class AgentMemory:
     def __init__(self, max_turns_per_session: int = 50) -> None:
+        # Memory kinds, kept explicit (see docs/RESEARCH_NOTES.md section 4):
+        # working and episodic: per session turns below.
+        # semantic: distilled facts, stored through remember_fact.
+        # procedural: the skill manifests themselves, loaded by the planner.
+        self._facts: Dict[str, str] = {}
         self._turns: Dict[str, Deque[Dict[str, Any]]] = defaultdict(
             lambda: deque(maxlen=max_turns_per_session)
         )
@@ -32,6 +37,23 @@ class AgentMemory:
         hits = KB.personal.search(query, top_k=top_k) + KB.domain4s.search(query, top_k=top_k)
         hits.sort(key=lambda h: h[1], reverse=True)
         return [{"doc_id": d, "score": s, "snippet": snip} for d, s, snip in hits[:top_k]]
+
+    def remember_fact(self, key: str, value: str) -> None:
+        """Semantic memory: one distilled fact, retrievable by key and by search."""
+        self._facts[key] = value
+        KB.personal.add_document(f"fact:{key}", f"{key}: {value}")
+
+    def recall_facts(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        hits = KB.personal.search(query, top_k=top_k * 2)
+        facts = [
+            {"doc_id": d, "score": s, "snippet": snip}
+            for d, s, snip in hits
+            if d.startswith("fact:")
+        ]
+        return facts[:top_k]
+
+    def fact(self, key: str) -> str | None:
+        return self._facts.get(key)
 
     def learn(self, skill_id: str, approvals_queued: int, guardrail_blocks: int) -> None:
         stats = self._outcomes[skill_id]

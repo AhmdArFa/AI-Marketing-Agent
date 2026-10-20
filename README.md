@@ -32,9 +32,21 @@ Domain pack structure: [docs/domain-4splus/DOMAIN_PACK.md](docs/domain-4splus/DO
 Python engine (`services/engine-py`):
 
 - Brain: `POST /v1/brain/run`, plus `GET /v1/brain/skills` and `/v1/brain/tools`
-  catalogs. Six skills loaded: prospect lead scoring, dealer retention,
-  campaign analysis and draft, monthly content calendar, draft guardrail
-  review, daily briefing.
+  catalogs (the tools catalog also renders in MCP format with
+  `?format=mcp`). Seven skills loaded: prospect lead scoring, dealer
+  retention, campaign analysis and draft, monthly content calendar, campaign
+  brief builder, draft guardrail review, daily briefing.
+- Draft quality: an evaluator optimizer loop scores drafts on guardrail
+  compliance, call to action, length, and grounding, then revises and rescores.
+- Defenses aligned with the OWASP LLM Top 10 (2025): a prompt injection
+  shield that blocks approval proposals on flagged runs, per run budgets,
+  PII redaction before memory storage. See [docs/SECURITY.md](docs/SECURITY.md).
+- Evaluation: a golden dataset for the domain in `services/engine-py/evals/`
+  runs in CI, so retrieval, scoring, segmentation, and guardrail quality
+  cannot silently regress. The research behind this round:
+  [docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md).
+- Observability: correlation IDs on every response and per route counters at
+  `GET /metrics`.
 - Domain pack for 4S PLUS: explainable lead scoring, retention segments
   (maintenance due, lapsed winback, survey detractors and promoters), pillar
   content calendar, claim guardrails, all grounded in verified product facts

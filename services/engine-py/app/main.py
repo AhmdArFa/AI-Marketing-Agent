@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 
 from .brain import Brain
 from .brain.schemas import BrainRunRequest, BrainRunResponse
+from .domain4s.campaign_brief import build_campaign_brief
 from .domain4s.content_calendar import build_calendar
 from .domain4s.guardrails import check_draft
 from .domain4s.lead_scoring import score_leads
@@ -54,7 +55,10 @@ def health() -> dict:
 
 @app.post("/v1/brain/run", response_model=BrainRunResponse)
 def brain_run(req: BrainRunRequest) -> BrainRunResponse:
-    result = brain.run(req.session_id, req.goal, req.context, req.explicit_domain)
+    try:
+        result = brain.run(req.session_id, req.goal, req.context, req.explicit_domain)
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
     return BrainRunResponse(**result)
 
 
@@ -69,8 +73,17 @@ def brain_skills() -> dict:
 
 
 @app.get("/v1/brain/tools")
-def brain_tools() -> dict:
+def brain_tools(format: str = "native") -> dict:
+    if format == "mcp":
+        return {"tools": brain.registry.mcp_list()}
     return {"tools": brain.registry.list()}
+
+
+@app.get("/metrics")
+def metrics() -> dict:
+    from .security import metrics_snapshot
+
+    return metrics_snapshot()
 
 
 @app.post("/v1/analytics/campaign", response_model=CampaignAnalysisResponse)
@@ -110,6 +123,11 @@ def domain_retention(req: RetentionRequest) -> RetentionResponse:
 def domain_calendar(req: ContentCalendarRequest) -> ContentCalendarResponse:
     slots = build_calendar(req.weeks, req.posts_per_week, req.audience)
     return ContentCalendarResponse(audience=req.audience, slots=slots)
+
+
+@app.post("/v1/domain4s/campaign-brief")
+def domain_campaign_brief(payload: dict) -> dict:
+    return build_campaign_brief(payload)
 
 
 @app.post("/v1/domain4s/guardrails/check", response_model=GuardrailCheckResponse)

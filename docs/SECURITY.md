@@ -19,6 +19,11 @@
 | Browser based attacks on API responses | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` |
 | Secret leakage | Keys come from the environment only, are never logged, returned, or committed; `.env` is git ignored |
 | Hallucinated marketing claims | Claim guardrails flag prohibited promises and unverified percentages before a human approves anything |
+| Prompt injection (OWASP LLM01) | Input shield scans goals and context for injection patterns; flagged runs keep compute results but lose every approval proposal, and the event is recorded. Containment, because OWASP notes there is no foolproof prevention |
+| Sensitive data in free text (LLM02) | PII redaction masks emails and phone numbers before text is stored in memory or echoed |
+| Unbounded consumption (LLM10) | Per run budgets in the brain (max plan steps, max context size, 413 on excess) on top of the per client rate limit |
+| Excessive agency (LLM06) | The brain has no mutation code path at all; mutating tools are approval proposals only, executed by TypeScript after a human decision |
+| Unobservable agent behavior | Correlation ID on every request and response, per route metrics at `/metrics`, per skill outcome counters in memory insights |
 | Silent automation of outreach | Human in the loop approval gate in TypeScript for every mutation, with an auditable pending state |
 | PII overexposure to models | Python receives only the fields a pipeline needs; personal collections are separated from brand collections, and the sovereign Ollama mode keeps sensitive data fully local |
 

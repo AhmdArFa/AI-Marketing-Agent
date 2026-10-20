@@ -25,6 +25,9 @@ class BrainRunResponse(BaseModel):
     plan_steps: List[BrainPlanStep]
     results: Dict[str, Any]
     pending_approvals: List[Dict[str, Any]]
+    blocked_approvals: List[Dict[str, Any]] = Field(default_factory=list)
+    shield: Optional[Dict[str, Any]] = None
+    draft_evaluation: Optional[Dict[str, Any]] = None
     executed_mutations: List[Any]
     grounding: List[Dict[str, Any]]
     guardrail: Optional[Dict[str, Any]] = None

@@ -18,8 +18,15 @@ When ENGINE_API_KEY is unset the service runs in open development mode, and
 import hmac
 import os
 import time
-from collections import defaultdict, deque
+import uuid
+from collections import Counter, defaultdict, deque
 from typing import Deque, Dict
+
+METRICS: Counter = Counter()
+
+
+def metrics_snapshot() -> dict:
+    return {"requests": {k: v for k, v in sorted(METRICS.items())}}
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -77,6 +84,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                     )
 
         response = await call_next(request)
+        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        response.headers["X-Request-Id"] = request_id
+        METRICS[f"{request.method} {request.url.path} -> {response.status_code}"] += 1
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"

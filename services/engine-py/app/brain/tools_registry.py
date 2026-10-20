@@ -9,6 +9,7 @@ returned as pending approvals for the TypeScript layer to gate.
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List
 
+from ..domain4s.campaign_brief import build_campaign_brief
 from ..domain4s.content_calendar import build_calendar
 from ..domain4s.guardrails import check_draft
 from ..domain4s.lead_scoring import score_leads
@@ -16,6 +17,13 @@ from ..domain4s.retention import build_retention_segments
 from ..pipelines.marketing_analytics import analyze_campaign_metrics
 from ..pipelines.personal import build_daily_briefing
 from ..pipelines.rag import KB
+
+
+GENERIC_INPUT_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": True,
+}
 
 
 @dataclass
@@ -26,6 +34,11 @@ class Tool:
     mutating: bool = False
     requires_approval: bool = False
     tags: List[str] = field(default_factory=list)
+    input_schema: Dict[str, Any] = field(default_factory=lambda: dict(GENERIC_INPUT_SCHEMA))
+
+    def mcp_descriptor(self) -> Dict[str, Any]:
+        """MCP tools/list shape: name, description, inputSchema."""
+        return {"name": self.name, "description": self.description, "inputSchema": self.input_schema}
 
 
 class ToolRegistry:
@@ -41,6 +54,9 @@ class ToolRegistry:
         if name not in self._tools:
             raise KeyError(f"Unknown tool: {name}")
         return self._tools[name]
+
+    def mcp_list(self) -> List[Dict[str, Any]]:
+        return [t.mcp_descriptor() for t in self._tools.values()]
 
     def list(self) -> List[Dict[str, Any]]:
         return [
@@ -86,6 +102,22 @@ def build_default_registry() -> ToolRegistry:
         description="Monthly content calendar from the 4S PLUS content pillars",
         handler=lambda a: {"slots": build_calendar(int(a.get("weeks", 4)), int(a.get("posts_per_week", 3)), a.get("audience", "prospecting"))},
         tags=["marketing", "domain4s", "content"],
+    ))
+    reg.register(Tool(
+        name="domain4s.campaign_brief",
+        description="Build a campaign plan from brief answers: audiences, pillars, cadence, KPIs, missing fields",
+        handler=lambda a: build_campaign_brief(a.get("brief", a)),
+        tags=["marketing", "domain4s", "planning"],
+        input_schema={
+            "type": "object",
+            "properties": {
+                "product_focus": {"type": "string"},
+                "audience_type": {"type": "string", "enum": ["prospecting", "dealer_marketing"]},
+                "monthly_goal": {"type": "string", "enum": ["demos", "appointments", "awareness"]},
+                "channels": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["product_focus", "audience_type", "monthly_goal"],
+        },
     ))
     reg.register(Tool(
         name="guardrails.check_draft",

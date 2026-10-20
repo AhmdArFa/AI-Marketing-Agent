@@ -14,8 +14,10 @@ behind interfaces, tools are registry entries, skills are data.
 
 from typing import Any, Dict, List
 
+from .evaluator import optimize_draft
 from .memory import AgentMemory
 from .planner import DeterministicPlanner, Plan
+from .shield import MAX_CONTEXT_CHARS, MAX_PLAN_STEPS, context_size, redact_pii, scan_context
 from .tools_registry import ToolRegistry, build_default_registry
 
 
@@ -38,8 +40,13 @@ class Brain:
         explicit_domain: str | None = None,
     ) -> Dict[str, Any]:
         context = dict(context or {})
+        if context_size(context) > MAX_CONTEXT_CHARS:
+            raise ValueError("Run budget exceeded: context payload too large for one brain run")
+        shield = scan_context(goal, context)
         grounding = self.memory.recall(goal)
         plan: Plan = self.planner.plan(goal, explicit_domain)
+        if len(plan.steps) > MAX_PLAN_STEPS:
+            plan.steps = plan.steps[:MAX_PLAN_STEPS]
 
         results: Dict[str, Any] = {}
         pending_approvals: List[Dict[str, Any]] = []
@@ -59,6 +66,7 @@ class Brain:
             results[step.tool] = tool.handler(args)
 
         guardrail = None
+        draft_evaluation = None
         guardrail_blocks = 0
         draft_text = context.get("draft_text")
         if draft_text:
@@ -67,6 +75,17 @@ class Brain:
             )
             if not guardrail.get("ok", True):
                 guardrail_blocks = len(guardrail.get("violations", []))
+            draft_evaluation = optimize_draft(draft_text, grounding_count=len(grounding))
+
+        # Containment (OWASP LLM01): a flagged run keeps its compute results,
+        # but every approval proposal is blocked and recorded.
+        blocked_approvals: List[Dict[str, Any]] = []
+        if shield["flagged"]:
+            blocked_approvals = [
+                {**a, "blocked_reason": "prompt_injection_shield", "flagged_fields": shield["fields"]}
+                for a in pending_approvals
+            ]
+            pending_approvals = []
 
         skill_id = plan.skill_id or "unmatched"
         self.memory.learn(skill_id, approvals_queued=len(pending_approvals), guardrail_blocks=guardrail_blocks)
@@ -74,7 +93,7 @@ class Brain:
             f"Skill {plan.skill_id or 'none'} ran {len(results)} compute tool(s), "
             f"queued {len(pending_approvals)} approval(s)."
         )
-        self.memory.remember_turn(session_id, goal, plan.skill_id, summary)
+        self.memory.remember_turn(session_id, redact_pii(goal), plan.skill_id, summary)
 
         return {
             "session_id": session_id,
@@ -87,6 +106,9 @@ class Brain:
             ],
             "results": results,
             "pending_approvals": pending_approvals,
+            "blocked_approvals": blocked_approvals,
+            "shield": shield,
+            "draft_evaluation": draft_evaluation,
             "executed_mutations": [],
             "grounding": grounding,
             "guardrail": guardrail,
