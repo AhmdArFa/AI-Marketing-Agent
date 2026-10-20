@@ -13,7 +13,8 @@ from typing import Any, Callable, Dict, List
 MAX_RESULT_CHARS = 20_000
 
 from ..domain4s.campaign_brief import build_campaign_brief
-from ..generation.copywriter import generate_campaign
+from ..domains.profile import DomainProfile
+from ..generation.copywriter import generate_campaign, generate_from_profile
 from ..domain4s.content_calendar import build_calendar
 from ..domain4s.guardrails import check_draft
 from ..domain4s.lead_scoring import score_leads
@@ -140,13 +141,22 @@ def build_default_registry() -> ToolRegistry:
     reg.register(Tool(
         name="generation.campaign_package",
         description="Generate real marketing posts (text, channel variants, image brief) for a named company and domain",
-        handler=lambda a: generate_campaign(
-            company_name=a.get("company_name", "Vo Technology"),
-            product_name=a.get("product_name", "4S PLUS"),
-            domain=a.get("domain", "automotive_erp"),
-            audience=a.get("audience", "prospecting"),
-            language=a.get("language", "en"),
-            count=int(a.get("count", 3)),
+        handler=lambda a: (
+            generate_from_profile(
+                DomainProfile.from_dict(a["profile"]),
+                audience=a.get("audience", "prospecting"),
+                language=a.get("language", "en"),
+                count=int(a.get("count", 3)),
+            )
+            if a.get("profile")
+            else generate_campaign(
+                company_name=a.get("company_name", "Vo Technology"),
+                product_name=a.get("product_name", "4S PLUS"),
+                domain=a.get("domain", "automotive_erp"),
+                audience=a.get("audience", "prospecting"),
+                language=a.get("language", "en"),
+                count=int(a.get("count", 3)),
+            )
         ),
         tags=["marketing", "generation"],
         input_schema={

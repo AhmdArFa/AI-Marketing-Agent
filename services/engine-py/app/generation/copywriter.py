@@ -1,111 +1,192 @@
-"""Copywriter: turns (company, product, domain, audience) into real posts.
+"""Copywriter: turns a Domain Profile into real marketing posts.
 
-Deterministic template engine seeded with verified domain facts, so output
-is real publishable copy today, in Arabic and English, and every draft is
-passed through the claim guardrails before it leaves. When a live LLM
-provider is configured, its copy can replace the template body behind this
-same interface; the guardrail gate stays either way.
+Domain agnostic by design: every word of substance (facts, value props,
+audience pains, CTAs, hashtags) comes from the caller's Domain Profile.
+The engine contributes structure: four post patterns per language, seeded
+rotation so the same profile produces a varied campaign, channel variants,
+and a claim guardrail pass on every single post before it leaves.
 """
 
 import hashlib
 from typing import Any, Dict, List
 
+from ..domains.profile import DomainProfile
 from ..domain4s.guardrails import check_draft
 
-TEMPLATES_EN_PROSPECTING = [
-    {
-        "pillar": "One Car Journey",
-        "body": "One car, one story. With {product} by {company}, a car sold in Sales carries its chassis history into Service, its parts requests into the warehouse, its invoice into Accounting, and its survey back into CRM. No retyping, no lost history. Book a live demo on your own data.",
-        "headline": "One Car. One Journey.",
-        "subline": "Sales to Service to Survey, in {product}",
+# The bundled example profile: Vo Technology / 4S PLUS. It is data, not
+# engine logic; any other company ships its own profile the same way.
+BUNDLED_4SPLUS_PROFILE: Dict[str, Any] = {
+    "company_name": "Vo Technology",
+    "product_name": "4S PLUS",
+    "industry": "Automotive ERP software",
+    "tagline": {
+        "en": "Sales, Spare Parts, Service and Survey in one system",
+        "ar": "المبيعات وقطع الغيار والصيانة وتقييم العملاء في نظام واحد",
     },
-    {
-        "pillar": "Workflow Relief",
-        "body": "Paper job cards hide the two numbers that decide a workshop's profit: actual hours versus sold hours. {product} by {company} tracks both on every JobCard, from W.I.P to Ready for invoicing. See your workshop the way it really runs. Book a live demo.",
-        "headline": "Actual vs Sold Hours",
-        "subline": "Know the profit on every JobCard",
+    "key_facts": {
+        "en": [
+            "A car sold in Sales carries its chassis history into Service, its parts requests into the warehouse, its invoice into Accounting, and its survey back into CRM.",
+            "Every JobCard tracks actual hours versus sold hours, from W.I.P to Ready for invoicing.",
+            "A JobCard raises a Create Request, Spare Parts confirms, and the issue drops stock instantly.",
+            "The system watches months and kilometres per car and reminds owners when periodic maintenance is due.",
+        ],
+        "ar": [
+            "العربية اللي اتباعت في المبيعات بتكمل برقم الشاسيه بتاعها في الصيانة، وقطع غيارها بتتطلب من المخزن، وفاتورتها بتروح المحاسبة، وتقييم العميل بيرجع لإدارة العملاء.",
+            "كل كرت شغل بيتابع الساعات الفعلية قدام الساعات المباعة، من بداية الشغل لحد جاهز للفوترة.",
+            "كرت الشغل بيعمل طلب قطع غيار، وقطع الغيار بتأكد، والصرف بيخصم من المخزون في لحظتها.",
+            "النظام بيراقب الشهور والكيلومترات لكل عربية وبيفكر العميل لما معاد الصيانة الدورية يقرب.",
+        ],
     },
-    {
-        "pillar": "Education",
-        "body": "A service reminder is not spam when it arrives at the right kilometre. Dealers on {product} let the system watch months and kilometres per car and remind owners before small wear becomes a big repair. That is retention you can schedule. Ask {company} how it works.",
-        "headline": "Reminders That Arrive on Time",
-        "subline": "Maintenance due, detected automatically",
+    "value_props": {
+        "en": [
+            "No retyping and no lost history between departments.",
+            "Know the profit on every JobCard, not just at month end.",
+            "Technicians never wait on a paper request again.",
+        ],
+        "ar": [
+            "من غير إعادة إدخال ومن غير ما تاريخ العربية يضيع بين الأقسام.",
+            "اعرف ربح كل كرت شغل، مش بس آخر الشهر.",
+            "الفني مش هيستنى طلب ورقي تاني.",
+        ],
     },
-    {
-        "pillar": "Pain Point",
-        "body": "Parts requested on paper get lost. In {product}, the JobCard raises a Create Request, Spare Parts confirms, and the issue drops stock instantly. The technician never waits on a guess. Book a live demo on your own data.",
-        "headline": "No More Lost Parts Requests",
-        "subline": "JobCard to warehouse in one flow",
-    },
-]
+    "audiences": [
+        {
+            "name": "Dealer or workshop owner",
+            "kind": "prospecting",
+            "pains": {
+                "en": ["running your workshop on paper job cards and memory"],
+                "ar": ["مدير مركزك بكرت شغل ورقي وبالذاكرة"],
+            },
+        },
+        {
+            "name": "Car owner",
+            "kind": "customers",
+            "pains": {
+                "en": ["forgetting your service intervals until wear becomes a repair"],
+                "ar": ["ناسي معاد صيانتك لحد ما الاستهلاك يبقى إصلاح كبير"],
+            },
+        },
+    ],
+    "pillars": [
+        {"name": "One Car Journey", "angle": "One car, one story, from sale to survey"},
+        {"name": "Workshop Profit", "angle": "Actual versus sold hours decide workshop profit"},
+        {"name": "Retention on Schedule", "angle": "A reminder at the right kilometre is retention you can schedule"},
+    ],
+    "ctas": {"en": ["Book a live demo on your own data."], "ar": ["احجز عرض حي على بياناتك."]},
+    "hashtags": ["#AutoERP", "#WorkshopManagement", "#4SPLUS", "#Dealership"],
+    "brand": {"bg": "#14181d", "accent": "#f59e0b", "text": "#f0f4f8", "muted": "#a0acbc"},
+}
 
-TEMPLATES_AR_PROSPECTING = [
-    {
-        "pillar": "رحلة عربية واحدة",
-        "body": "عربية واحدة، قصة واحدة. مع {product} من {company}، العربية اللي اتباعت في المبيعات بتكمل برقم الشاسيه بتاعها في الصيانة، وقطع غيارها بتتطلب من المخزن، وفاتورتها بتروح المحاسبة، وتقييم العميل بيرجع لإدارة العملاء. من غير إعادة إدخال ومن غير ما التاريخ يضيع. احجز عرض حي على بياناتك.",
-        "headline": "عربية واحدة. رحلة واحدة.",
-        "subline": "من البيع للصيانة لتقييم العميل في {product}",
-    },
-    {
-        "pillar": "تخفيف الشغل اليدوي",
-        "body": "كروت الشغل الورقية بتخبي أهم رقمين في ربح أي مركز صيانة: الساعات الفعلية والساعات المباعة. {product} من {company} بيتابع الرقمين على كل كرت شغل، من بداية الشغل لحد جاهز للفوترة. شوف مركزك على حقيقته. احجز عرض حي.",
-        "headline": "الفعلي قدام المباع",
-        "subline": "اعرف ربح كل كرت شغل بدقة",
-    },
-    {
-        "pillar": "توعية",
-        "body": "تنبيه الصيانة مش إزعاج لو وصل في الكيلومتر الصح. الموزعين على {product} بيخلوا النظام يراقب الشهور والكيلومترات لكل عربية ويفكر العميل قبل ما الاستهلاك البسيط يبقى إصلاح كبير. ده احتفاظ بالعملاء يتعمل بجدول. اسأل {company} بيشتغل ازاي.",
-        "headline": "تنبيهات بتوصل في وقتها",
-        "subline": "الصيانة الدورية بتتكشف تلقائيا",
-    },
-    {
-        "pillar": "نقطة ألم",
-        "body": "طلبات قطع الغيار الورقية بتضيع. في {product}، كرت الشغل بيعمل طلب، وقطع الغيار بتأكد، والصرف بيخصم من المخزون في لحظتها. الفني مش بيستنى تخمين. احجز عرض حي على بياناتك.",
-        "headline": "طلبات قطع الغيار مش بتضيع",
-        "subline": "من كرت الشغل للمخزن في خطوة واحدة",
-    },
-]
-
-TEMPLATES_EN_DEALER = [
-    {
-        "pillar": "Retention",
-        "body": "Your next service is due, and your car's full history is already with us. Book your periodic maintenance today and keep the record that protects your resale value. One visit, everything on file.",
-        "headline": "Your Service Is Due",
-        "subline": "Full history kept with your car",
-    },
-    {
-        "pillar": "Trust",
-        "body": "After every visit we ask one question: how did we do? Your score decides what happens next, and low scores get a human call, not an automated message. Your voice runs this workshop.",
-        "headline": "Your Score Decides",
-        "subline": "Real follow up after every visit",
-    },
-]
-
-TEMPLATES_AR_DEALER = [
-    {
-        "pillar": "احتفاظ بالعملاء",
-        "body": "صيانتك الدورية معادها قرب، وتاريخ عربيتك كله محفوظ عندنا. احجز صيانتك النهاردة وحافظ على السجل اللي بيحمي قيمة عربيتك عند إعادة البيع. زيارة واحدة وكل حاجة متسجلة.",
-        "headline": "معاد صيانتك قرب",
-        "subline": "تاريخ عربيتك محفوظ بالكامل",
-    },
-    {
-        "pillar": "ثقة",
-        "body": "بعد كل زيارة بنسألك سؤال واحد: خدمتنا كانت عاملة ازاي؟ تقييمك هو اللي بيقرر الخطوة الجاية، والتقييمات القليلة بتاخد مكالمة من إنسان، مش رسالة آلية. صوتك هو اللي بيدير المركز.",
-        "headline": "تقييمك هو اللي بيقرر",
-        "subline": "متابعة حقيقية بعد كل زيارة",
-    },
-]
-
-HASHTAGS = {
-    "prospecting": ["#AutoERP", "#WorkshopManagement", "#4SPLUS", "#Dealership", "#AgenticAI"],
-    "dealer_marketing": ["#CarService", "#PeriodicMaintenance", "#4SPLUS", "#CustomerCare"],
+PATTERNS = {
+    "en": [
+        "{fact} This is how {product} works at {company}. {cta}",
+        "Still {pain}? {prop} That is {product} by {company}. {cta}",
+        "{prop} {fact} {brand} {cta}",
+        "{angle}. {fact} {cta}",
+    ],
+    "ar": [
+        "{fact} ده أسلوب {product} من {company}. {cta}",
+        "لسه {pain}؟ {prop} ده {product} من {company}. {cta}",
+        "{prop} {fact} {brand} {cta}",
+        "{angle}. {fact} {cta}",
+    ],
 }
 
 
-def _seeded_order(items: List[Dict[str, str]], seed_text: str) -> List[Dict[str, str]]:
-    digest = hashlib.sha256(seed_text.encode("utf-8")).digest()
-    order = sorted(range(len(items)), key=lambda i: digest[i % len(digest)])
-    return [items[i] for i in order]
+def _rotate(items: List[str], seed: str, offset: int = 0) -> List[str]:
+    if not items:
+        return []
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    start = (digest[0] + offset) % len(items)
+    return items[start:] + items[:start]
+
+
+def _audience_pains(profile: DomainProfile, audience: str, language: str) -> List[str]:
+    kinds = {"prospecting"} if audience == "prospecting" else {"customers", "dealer_marketing"}
+    pains: List[str] = []
+    for aud in profile.audiences:
+        if aud["kind"] in kinds:
+            from ..domains.profile import pick
+
+            pains.extend(pick(aud["pains"], language))
+    return pains
+
+
+def generate_from_profile(
+    profile: DomainProfile,
+    audience: str = "prospecting",
+    language: str = "en",
+    count: int = 3,
+) -> Dict[str, Any]:
+    facts = profile.facts(language) or [profile.tagline_text(language) or profile.industry]
+    props = profile.props(language) or facts
+    pains = _audience_pains(profile, audience, language)
+    patterns = PATTERNS.get(language, PATTERNS["en"])
+    seed = f"{profile.company_name}:{language}:{audience}"
+    facts_r = _rotate(facts, seed, 0)
+    props_r = _rotate(props, seed, 1)
+    pains_r = _rotate(pains, seed, 2)
+    pillars = profile.pillars or [{"name": profile.industry or "Value", "angle": profile.tagline_text(language)}]
+    cta = profile.cta(language)
+    tags = profile.hashtags or [f"#{profile.company_name.replace(' ', '')}"]
+
+    posts: List[Dict[str, Any]] = []
+    total = max(1, min(count, 12))
+    for i in range(total):
+        fact = facts_r[i % len(facts_r)]
+        prop = props_r[i % len(props_r)]
+        pain = pains_r[i % len(pains_r)] if pains_r else prop
+        pillar = pillars[i % len(pillars)]
+        angle = pillar.get("angle") or profile.tagline_text(language)
+        pattern = patterns[i % len(patterns)]
+        if "{pain}" in pattern and not pains_r:
+            pattern = patterns[2]
+        product_label = profile.product_name or profile.company_name
+        brand_line = (
+            f"Built by {profile.company_name}, inside {product_label}."
+            if language == "en"
+            else f"من تطوير {profile.company_name}، جوه {product_label}."
+        )
+        body = pattern.format(
+            fact=fact, prop=prop, pain=pain, angle=angle, brand=brand_line,
+            product=product_label,
+            company=profile.company_name, cta=cta,
+        )
+        body = " ".join(body.split())
+        guard = check_draft(body)
+        short = body if len(body) <= 260 else body[:257].rsplit(" ", 1)[0] + "..."
+        headline = pillar.get("name") or prop.split(".")[0][:48]
+        posts.append(
+            {
+                "id": f"post-{i + 1}",
+                "pillar": pillar.get("name", ""),
+                "body": body,
+                "variants": {
+                    "linkedin": body + "\n\n" + " ".join(tags),
+                    "facebook": body,
+                    "x": short,
+                    "instagram": body + "\n\n" + " ".join(tags),
+                },
+                "hashtags": tags,
+                "image": {
+                    "headline": headline,
+                    "subline": profile.tagline_text(language),
+                    "theme": "profile",
+                    "brand": dict(profile.brand),
+                },
+                "guardrail_ok": guard["ok"],
+                "status": "draft_ready" if guard["ok"] else "blocked_by_guardrails",
+            }
+        )
+    return {
+        "company": profile.company_name,
+        "product": profile.product_name,
+        "industry": profile.industry,
+        "audience": audience,
+        "language": language,
+        "posts": posts,
+        "all_guardrail_ok": all(p["guardrail_ok"] for p in posts),
+    }
 
 
 def generate_campaign(
@@ -116,45 +197,11 @@ def generate_campaign(
     language: str = "en",
     count: int = 3,
 ) -> Dict[str, Any]:
-    if language == "ar":
-        pool = TEMPLATES_AR_PROSPECTING if audience == "prospecting" else TEMPLATES_AR_DEALER
-    else:
-        pool = TEMPLATES_EN_PROSPECTING if audience == "prospecting" else TEMPLATES_EN_DEALER
-    ordered = _seeded_order(pool, f"{company_name}:{product_name}:{audience}:{language}")
-    tags = HASHTAGS.get(audience, HASHTAGS["prospecting"])
-
-    posts: List[Dict[str, Any]] = []
-    for idx, tpl in enumerate(ordered[: max(1, min(count, len(ordered)))]):
-        body = tpl["body"].format(product=product_name, company=company_name)
-        guard = check_draft(body)
-        short = body if len(body) <= 260 else body[:257].rsplit(" ", 1)[0] + "..."
-        posts.append(
-            {
-                "id": f"post-{idx + 1}",
-                "pillar": tpl["pillar"],
-                "body": body,
-                "variants": {
-                    "linkedin": body + "\n\n" + " ".join(tags),
-                    "facebook": body,
-                    "x": short,
-                    "instagram": body + "\n\n" + " ".join(tags),
-                },
-                "hashtags": tags,
-                "image": {
-                    "headline": tpl["headline"],
-                    "subline": tpl["subline"].format(product=product_name, company=company_name),
-                    "theme": "automotive" if domain == "automotive_erp" else "saas",
-                },
-                "guardrail_ok": guard["ok"],
-                "status": "draft_ready" if guard["ok"] else "blocked_by_guardrails",
-            }
-        )
-    return {
-        "company": company_name,
-        "product": product_name,
-        "domain": domain,
-        "audience": audience,
-        "language": language,
-        "posts": posts,
-        "all_guardrail_ok": all(p["guardrail_ok"] for p in posts),
-    }
+    """Backward compatible entry point on the bundled 4S PLUS profile."""
+    data = dict(BUNDLED_4SPLUS_PROFILE)
+    data["company_name"] = company_name
+    data["product_name"] = product_name
+    profile = DomainProfile.from_dict(data)
+    result = generate_from_profile(profile, audience=audience, language=language, count=count)
+    result["domain"] = domain
+    return result

@@ -17,22 +17,30 @@ export default function CampaignStudio() {
   const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [publishState, setPublishState] = useState<Record<string, any>>({});
   const [busy, setBusy] = useState(false);
+  const [profileJson, setProfileJson] = useState("");
 
   async function generate() {
     setBusy(true);
     setError(null);
+    let profile: unknown = null;
+    if (profileJson.trim()) {
+      try {
+        profile = JSON.parse(profileJson);
+      } catch {
+        setError("The domain profile is not valid JSON.");
+        setBusy(false);
+        return;
+      }
+    }
     try {
       const r = await fetch(`${ENGINE}/v1/generate/campaign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_name: company,
-          product_name: product,
-          language,
-          audience,
-          count,
-          domain: "automotive_erp",
-        }),
+        body: JSON.stringify(
+          profile
+            ? { profile, language, audience, count }
+            : { company_name: company, product_name: product, language, audience, count, domain: "automotive_erp" },
+        ),
       });
       if (!r.ok) throw new Error(String(r.status));
       setCampaign(await r.json());
@@ -96,6 +104,17 @@ export default function CampaignStudio() {
           {busy ? "Generating..." : "Generate campaign"}
         </button>
       </div>
+
+      <label className="profilebox">
+        Domain profile JSON (optional, for ANY company: facts, audiences, pillars, brand colors. When filled, it
+        overrides the company fields above. Examples ship in services/engine-py/examples/)
+        <textarea
+          value={profileJson}
+          onChange={(e) => setProfileJson(e.target.value)}
+          rows={6}
+          placeholder='{"company_name": "My Company", "product_name": "My Product", "key_facts": {"en": ["..."]}, "brand": {"accent": "#2dd4bf", "bg": "#062a30", "text": "#eefcfb", "muted": "#9fc6c9"}}'
+        />
+      </label>
 
       {error && <div className="alert">{error}</div>}
 

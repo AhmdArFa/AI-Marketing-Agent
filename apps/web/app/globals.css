@@ -110,6 +110,11 @@ code { background: #0d1730; padding: 2px 6px; border-radius: 6px; font-size: 13p
   background: var(--panel); color: var(--text); border: 1px solid var(--line);
   border-radius: 10px; padding: 10px 12px; font-size: 14px;
 }
+.profilebox { display: grid; gap: 8px; margin: 6px 0 18px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.profilebox textarea {
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px; font-family: ui-monospace, monospace; font-size: 12.5px; width: 100%;
+}
 .postgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 10px; }
 .postcard { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .postcard img { width: 100%; display: block; aspect-ratio: 1 / 1; object-fit: cover; }

@@ -90,6 +90,32 @@ The engine allows the UI origin through a CORS allowlist
 (`ENGINE_CORS_ORIGINS`, development default covers localhost ports 3000 and
 3001). Set `NEXT_PUBLIC_ENGINE_URL` when the engine lives elsewhere.
 
+## Market any company: run it on your machine
+
+The agent is domain agnostic. Describe any company once in a Domain Profile
+JSON (facts, audiences, pillars, CTAs, brand colors), and it generates the
+posts, renders branded images, and pushes publish packages. Full guide:
+[docs/DOMAIN_PROFILE.md](docs/DOMAIN_PROFILE.md), ready examples in
+`services/engine-py/examples/` (an automotive ERP and a dental clinic).
+
+```bash
+git clone https://github.com/AhmdArFa/AI-Marketing-Agent.git
+cd AI-Marketing-Agent/services/engine-py
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+
+# Drafts for your own company profile
+python run_campaign.py --profile examples/vo_technology_4splus.json --language ar
+
+# Generate + branded images + publish packages in outputs/
+python run_campaign.py --profile examples/nile_dental_clinic.json \
+  --language ar --audience customers --approve
+```
+
+Publishing channels (`--channel`): `file_export` to `outputs/`, `webhook`
+to `PUBLISH_WEBHOOK_URL`, `meta` to a Facebook Page when `META_PAGE_ID` and
+`META_ACCESS_TOKEN` are set. Nothing is pushed without `--approve`.
+
 ## Run it
 
 ```bash

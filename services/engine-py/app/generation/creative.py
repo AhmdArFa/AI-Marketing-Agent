@@ -105,8 +105,21 @@ def render_image(
     subline: str,
     theme: str = "automotive",
     size: Tuple[int, int] = (1080, 1080),
+    palette: dict | None = None,
 ) -> bytes:
-    palette = THEMES.get(theme, THEMES["default"])
+    if palette:
+        from ..domains.profile import hex_to_rgb
+
+        palette = {
+            k: (hex_to_rgb(v) if isinstance(v, str) else v)
+            for k, v in palette.items()
+            if k in ("bg", "accent", "text", "muted")
+        }
+        base = dict(THEMES["default"])
+        base.update(palette)
+        palette = base
+    else:
+        palette = THEMES.get(theme, THEMES["default"])
     width, height = size
     img = Image.new("RGB", size, palette["bg"])
     draw = ImageDraw.Draw(img)

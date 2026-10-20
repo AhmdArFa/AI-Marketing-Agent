@@ -151,27 +151,45 @@ def domain_calendar(req: ContentCalendarRequest) -> ContentCalendarResponse:
 
 @app.post("/v1/generate/campaign")
 def generate_campaign_endpoint(payload: dict) -> dict:
-    result = generate_campaign(
-        company_name=payload.get("company_name", "Vo Technology"),
-        product_name=payload.get("product_name", "4S PLUS"),
-        domain=payload.get("domain", "automotive_erp"),
-        audience=payload.get("audience", "prospecting"),
-        language=payload.get("language", "en"),
-        count=int(payload.get("count", 3)),
-    )
+    from urllib.parse import urlencode
+
+    if payload.get("profile"):
+        from .domains.profile import DomainProfile
+        from .generation.copywriter import generate_from_profile
+
+        try:
+            profile = DomainProfile.from_dict(payload["profile"])
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        result = generate_from_profile(
+            profile,
+            audience=payload.get("audience", "prospecting"),
+            language=payload.get("language", "en"),
+            count=int(payload.get("count", 3)),
+        )
+    else:
+        result = generate_campaign(
+            company_name=payload.get("company_name", "Vo Technology"),
+            product_name=payload.get("product_name", "4S PLUS"),
+            domain=payload.get("domain", "automotive_erp"),
+            audience=payload.get("audience", "prospecting"),
+            language=payload.get("language", "en"),
+            count=int(payload.get("count", 3)),
+        )
     for post in result["posts"]:
         img = post["image"]
-        from urllib.parse import urlencode
-
-        post["image_url"] = "/v1/generate/image?" + urlencode(
-            {
-                "company": result["company"],
-                "product": result["product"],
-                "headline": img["headline"],
-                "subline": img["subline"],
-                "theme": img["theme"],
-            }
-        )
+        params = {
+            "company": result["company"],
+            "product": result["product"],
+            "headline": img["headline"],
+            "subline": img["subline"],
+            "theme": img["theme"],
+        }
+        brand = img.get("brand") or {}
+        for key in ("bg", "accent", "text", "muted"):
+            if brand.get(key):
+                params[key] = brand[key]
+        post["image_url"] = "/v1/generate/image?" + urlencode(params)
     return result
 
 
@@ -182,10 +200,18 @@ def generate_image_endpoint(
     headline: str = "One Car. One Journey.",
     subline: str = "",
     theme: str = "automotive",
+    bg: str | None = None,
+    accent: str | None = None,
+    text: str | None = None,
+    muted: str | None = None,
 ):
     from fastapi.responses import Response
 
-    png = render_image(company, product, headline, subline, theme)
+    palette = None
+    supplied = {"bg": bg, "accent": accent, "text": text, "muted": muted}
+    if any(supplied.values()):
+        palette = {k: v for k, v in supplied.items() if v}
+    png = render_image(company, product, headline, subline, theme, palette=palette)
     return Response(content=png, media_type="image/png")
 
 
@@ -206,6 +232,7 @@ def publish_endpoint(payload: dict) -> dict:
             img.get("headline", ""),
             img.get("subline", ""),
             img.get("theme", "automotive"),
+            palette=img.get("brand"),
         )
     return publish_package(
         company=payload.get("company_name", "Vo Technology"),
