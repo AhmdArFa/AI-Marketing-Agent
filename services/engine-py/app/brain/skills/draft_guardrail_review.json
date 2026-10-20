@@ -1,0 +1,1 @@
+{"description":"Check any marketing draft against prohibited claims and unverified percentages before a human sees it","domain":"marketing","follow_up_tool":null,"guardrails":[],"id":"draft_guardrail_review","name":"Draft Guardrail Review","steps":[{"args_from":"context","tool":"guardrails.check_draft"}],"triggers":["review draft","check this draft","guardrail","راجع المسودة"]}

@@ -1,0 +1,15 @@
+services:
+  engine-py:
+    build: ./services/engine-py
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+  orchestrator-ts:
+    build: ./apps/orchestrator-ts
+    ports:
+      - "3000:3000"
+    environment:
+      - PYTHON_ENGINE_URL=http://engine-py:8000
+    depends_on:
+      - engine-py

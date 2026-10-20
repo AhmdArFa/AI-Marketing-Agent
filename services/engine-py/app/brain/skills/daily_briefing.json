@@ -1,0 +1,1 @@
+{"description":"Synthesize a daily briefing from calendar events and email triage","domain":"personal","follow_up_tool":"calendar.create_focus_block","guardrails":[],"id":"daily_briefing","name":"Daily Briefing","steps":[{"args_from":"context","tool":"personal.daily_briefing"}],"triggers":["briefing","my day","ملخص اليوم","يومي"]}
